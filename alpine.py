@@ -989,9 +989,9 @@ def main():
         cfg.cve = True
 
     if not cfg.start_attack:
-        print("usage: python3 alpine_hunt.py --start-attack --all --verify")
-        print("       python3 alpine_hunt.py --start-attack --all --portscan --verify")
-        print("       python3 alpine_hunt.py --test github.com:22")
+        print("usage: python3 alpine.py --start-attack --all --verify")
+        print("       python3 alpine.py --start-attack --all --portscan --verify")
+        print("       python3 alpine.py --test github.com:22")
         return
 
     if not (cfg.all or cfg.targets or cfg.asn or cfg.shodan):

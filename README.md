@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <b>Alpine Linux SSH Vulnerability Research & Detection Tool</b>
+  <b>Alpine Linux SSH Vulnerability Research and auto exploit</b>
 </p>
 
 <p align="center">
@@ -197,6 +197,6 @@ Users are responsible for ensuring that all testing activities comply with appli
 
 ## Author
 
-**alpine.py**
+**FalconEye*
 
-Security Research & Vulnerability Assessment
+Security Engineer

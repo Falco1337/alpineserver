@@ -1,7 +1,7 @@
 ```markdown
 # alpine.py
 
-![alpine.py](/alpine.png)
+![alpine.py](./alpine.png)
 
 Mass SSH scanner that hunts Alpine Linux hosts and tests them for
 [CVE-2026-123158](https://nvd.nist.gov/vuln/detail/CVE-2026-123158) (*sshole*), an

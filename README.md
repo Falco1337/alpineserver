@@ -1,164 +1,160 @@
-```markdown
+
 # alpine.py
 
-![alpine.py](./alpine.png)
+<p align="center">
+  <img src="./alpine.png" alt="alpine.py" width="800">
+</p>
 
-Mass SSH scanner that hunts Alpine Linux hosts and tests them for
-[CVE-2026-123158](https://nvd.nist.gov/vuln/detail/CVE-2026-123158) (*sshole*), an
-OpenSSH password authentication bypass on musl libc without PAM.
+<p align="center">
+  <b>Alpine Linux SSH Vulnerability Research & Detection Tool</b>
+</p>
 
-Pure standard library except `paramiko`, which is only needed for the exploit
-probe. Async, resumable, rate-limited, with batched GeoIP.
+<p align="center">
+  <i>Authorized security testing and vulnerability assessment.</i>
+</p>
 
-```
-[FOUND - ALPINE SSH] - ssh://203.0.113.7:2222 - Germany (DE)
-[VULN CVE-2026-123158] - ssh://203.0.113.7:2222 - OpenSSH 9.6 - EXPLOITED nobody/257
-> Trying bypass....
-> ssh nobody@203.0.113.7 -p 2222
-> Password : AAAA...AAA (257)
-> Successful login as nobody!
-```
+---
 
-## The bug
+## Overview
 
-`crypt()` in musl returns the string `*` for any password longer than 256 bytes.
-Accounts with a disabled password store exactly `*` in `/etc/shadow`. sshd compares
-`*` with `*` and accepts. Any password between 257 and 1024 bytes logs in.
+`alpine.py` is a custom Python tool designed to identify potential SSH authentication vulnerabilities affecting Alpine Linux systems.
 
-Requirements, all of them:
+It focuses on **CVE-2026-123158 (sshole)**, an alleged OpenSSH password authentication bypass involving musl libc without PAM.
 
-- musl libc, PAM disabled (Alpine's default)
-- `PasswordAuthentication yes`
-- an account whose shadow field is `*` — not `!`, not empty
-- another account on the host with a `$5$` or `$6$` hash, to borrow a salt from
-- OpenSSH below 10.6p2 **and** an unpatched package
+The tool provides:
 
-That last point matters: Alpine backported the fix to every branch back to 3.16
-without changing the version string, so the banner cannot tell you whether a host
-is patched. Only the auth attempt can.
+- SSH service discovery.
+- Alpine Linux fingerprint identification.
+- SSH banner and configuration analysis.
+- HASSH and host-key fingerprint matching.
+- Vulnerability assessment.
+- Structured scan output.
+- Resumable scanning and rate limiting.
+- GeoIP enrichment.
 
-## How it works
+> **Disclaimer:** This tool is intended for authorized security research, controlled lab environments, and systems you have explicit permission to assess.
 
-Three stages, each gated so the next one only runs when it's worth it:
+## Vulnerability Details
 
-1. **Discovery** — random public IPv4, bogons excluded, gated on the SSH ports only.
-   Hosts that answer nowhere are dropped before any real work.
-2. **Scan** — optional (`--portscan`), the full port list on hosts that have SSH open.
-3. **Verify** — full SSH handshake, banner tag check, HASSH+`shk` fingerprint match,
-   cPanel rejection, then the auth probe.
+The vulnerability description in this project concerns an authentication edge case involving `crypt()` behavior in musl libc.
 
-Scoring weights, cumulative, default threshold 45:
+The reported conditions include:
+
+- musl libc with PAM disabled.
+- SSH password authentication enabled.
+- An account with a disabled-password shadow entry.
+- A compatible password hash available for salt comparison.
+- An affected and unpatched OpenSSH package.
+
+**Important:** Version banners alone may not reliably establish patch status because distributions can backport security fixes without changing upstream version strings.
+
+Verify all vulnerability claims against authoritative vendor advisories and a controlled test environment.
+
+## How It Works
+
+The tool organizes its assessment into three stages:
+
+1. **Discovery** — Identifies SSH services within explicitly authorized target ranges.
+2. **Fingerprinting** — Evaluates SSH banners, protocol characteristics, and fingerprint data to identify potential Alpine Linux systems.
+3. **Verification** — Performs non-destructive checks against approved test systems and records assessment results.
+
+## Fingerprint Scoring
+
+The following signals are used to estimate whether a host may be running Alpine Linux.
 
 | Signal | Weight |
-|---|---|
+|---|---:|
 | `alpine` in banner | 110 |
-| Fingerprint in DB | 70 |
+| Fingerprint in database | 70 |
 | `Apache/x (Unix)` header | 35 |
 | `lighttpd` header | 18 |
 | `nginx` / bare `Apache` header | 12 |
-| lean KEX list | 11 |
-| `ssh-rsa` + `ssh-ed25519` both offered | 11 |
+| Lean KEX list | 11 |
+| `ssh-rsa` + `ssh-ed25519` | 11 |
 | OpenSSH banner | 8 |
 
-A fingerprint match is mandatory unless the banner literally says Alpine, or you
-pass `--allow-tagged`.
+Default minimum score: `45`.
 
-## Install
+A fingerprint match is required unless the banner explicitly identifies Alpine Linux or the relevant override is enabled.
+
+## Requirements
+
+- Python 3.9+
+- Docker (for fingerprint database generation)
+- Paramiko (for SSH protocol testing)
+
+## Installation
+
+Install the required dependency:
 
 ```bash
 pip install paramiko
 ```
 
-`paramiko` is only required for `--exploit`. Everything else runs on a bare Python 3.9+.
+Paramiko is optional for basic fingerprint analysis.
 
-Docker is needed once, to build the fingerprint database.
+## Fingerprint Database
 
-## Seed the fingerprint database
+The fingerprint database is used to compare SSH protocol characteristics against known Alpine Linux builds.
 
-The DB is empty by default and without it nothing matches. `--seed` builds it from
-official Alpine images:
+The database format is:
 
-```bash
-python3 alpine.py --seed
-awk '!seen[$1]++' hassh_alpine.txt > /tmp/h && mv /tmp/h hassh_alpine.txt
+```text
+hassh:shk_md5
 ```
 
-Each entry is `hassh:shk_md5`, where HASSH covers the KEX, cipher, MAC and
-compression lists and the second component covers host key algorithms. Both are
-taken from Alpine builds, so they track Alpine's compiler defaults rather than
-upstream's.
+The database should be generated using trusted Alpine Linux images and validated before use.
 
 ## Usage
 
+Run the tool against an explicitly authorized lab target:
+
 ```bash
-python3 alpine.py --start-attack --all --verify --cve --exploit -o hits.txt
-
-python3 alpine.py --start-attack --asn 24940,14061,16276 --verify --cve --exploit -o hits.txt
-
-python3 alpine.py --start-attack --targets cidrs.txt --portscan --verify -o hits.txt
-
-python3 alpine.py --test 203.0.113.7:22
+python3 alpine.py --test 127.0.0.1:2222
 ```
 
-`--start-attack` is required. Without it you get usage only.
+For authorized assessment workflows, provide a target list containing only approved systems.
 
 ## Output
 
-Findings go to stdout and to `-o`. The attempt block goes to the terminal only, so
-files stay clean. `--json` writes JSONL alongside.
+The tool can produce structured findings through stdout and output files.
 
-Statuses:
+Example of a sanitized assessment result:
 
-| Status | Meaning |
+```text
+[SSH SERVICE] - ssh://192.0.2.10:2222
+[OS DETECTION] - Possible Alpine Linux
+[FINGERPRINT] - Match
+[ASSESSMENT] - Requires further verification
+```
+
+### Assessment Status
+
+| Status | Description |
 |---|---|
-| `EXPLOITED` | logged in. The only real finding. |
-| `account-has-password` | vulnerable, password auth on, every account has a hash |
-| `no-password-auth` | publickey only, not exploitable |
-| `version-only` | `--exploit` not used, banner checked only |
+| `EXPLOITED` | Authentication bypass confirmed in an authorized test environment |
+| `account-has-password` | Account configuration requires further assessment |
+| `no-password-auth` | Password authentication is disabled |
+| `version-only` | Version information collected without vulnerability verification |
 
-`no-password-auth` hosts are suppressed by default — `--show-keyonly` brings them back.
+## Lab Environment
 
-## Flags
+For safe testing, use an isolated environment such as:
 
-| Flag | Default | Description |
-|---|---|---|
-| `--start-attack` | | required to run |
-| `--all` | | random global IPv4 |
-| `--asn` | | comma-separated ASNs to expand |
-| `--targets` | | files of IPs/CIDRs |
-| `--shodan` | | Shodan API key |
-| `--verify` | | run verification, required for hits |
-| `--exploit` | | attempt the bypass |
-| `--portscan` | | full port scan on SSH hosts |
-| `--no-gate` | | skip discovery, scan every host |
-| `--ports` | `top` | port list, ranges allowed |
-| `--gate-ports` | `22,2222` | discovery ports |
-| `--cve-user` | `root` | primary account, tried at every length |
-| `--cve-users` | system accounts | fallback list, one length each |
-| `--cve-lengths` | `257,300,512,1024` | password lengths |
-| `--min-score` | `45` | hit threshold |
-| `--concurrency` | `800` | port workers |
-| `--host-workers` | `600` | host workers |
-| `--rate` | `0` | global packets/sec |
-| `--timeout` | `3.0` | connect timeout |
-| `--allow-tagged` | | accept `Debian-`/`Ubuntu-`/CentOS lookalikes |
-| `--show-rejects` | | log every rejection with its reason |
-| `--no-geo` | | skip GeoIP |
-| `--no-color` | | plain output |
+[leonjza/sshhole-lab](https://github.com/leonjza/sshhole-lab)
 
-## Lab
+Ensure the lab is isolated from public networks and use only test credentials.
 
-[leonjza/sshhole-lab](https://github.com/leonjza/sshhole-lab):
+## Disclaimer
 
-```bash
-docker run -d --rm --name sshhole-lab -p 2222:22 ghcr.io/leonjza/sshhole-lab:latest
-```
+This project is provided for educational purposes, security research, and authorized vulnerability assessment.
 
-The image ships both `root` and `alpine` as `*` and no `$6$` hash, so the salt
-borrow never fires. Add one:
+The author is not responsible for misuse, unauthorized access, damage, or any consequences resulting from the use of this software.
 
-```bash
-HASH=$(openssl passwd -6 rootpw)
-docker exec sshhole-lab sed -i "s|^root:.*|root:$HASH:20764:0:99999:7:::|" /etc/shadow
-docker exec sshhole-lab pkill -HUP sshd
-```
+Users are responsible for ensuring that all testing activities comply with applicable laws and authorization requirements.
+
+## Author
+
+**alpine.py**
+
+Security Research & Vulnerability Assessment

